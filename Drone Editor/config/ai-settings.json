@@ -1,0 +1,37 @@
+{
+    "version": "1.0",
+    "api_keys": {
+        "color_grading": "your_api_key_here"
+    },
+    "services": {
+        "scene_detection": {
+            "enabled": true,
+            "use_local": true,
+            "sensitivity": 0.4,
+            "min_scene_length": 2.0,
+            "max_scenes": 20
+        },
+        "color_grading": {
+            "enabled": true,
+            "use_local": false,
+            "endpoint": "http://localhost:5000/api/color-grade",
+            "models": ["drone-aerial-v1", "cinematic-v2", "natural-v1"]
+        },
+        "audio_processing": {
+            "enabled": true,
+            "use_local": true,
+            "noise_reduction": 0.5,
+            "wind_removal": true,
+            "eq_preset": "drone"
+        }
+    },
+    "binaries": {
+        "scene_detect": "./bin/scene_detect",
+        "audio_enhance": "./bin/audio_enhance",
+        "ffmpeg": "./bin/ffmpeg"
+    },
+    "fallback": {
+        "always_allow_simulation": true,
+        "notify_on_fallback": true
+    }
+}
