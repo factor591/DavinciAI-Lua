@@ -1,0 +1,13 @@
+# Log files
+*.log
+
+# Temporary files
+*.tmp
+
+# Operating system files
+.DS_Store
+Thumbs.db
+
+# User-specific files
+*.user
+*.suo
