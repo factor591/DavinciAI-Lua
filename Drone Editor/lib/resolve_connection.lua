@@ -55,6 +55,31 @@ function resolve_connection.init(retries, delay)
             if success and result then
                 resolve = result
                 logging.info("Connected to DaVinci Resolve on attempt " .. attempt)
+                
+                -- Log methods available on Project and Timeline objects
+                local project = resolve:GetProjectManager():GetCurrentProject()
+                if project then
+                    logging.info("Available methods on Project object:")
+                    for k, v in pairs(project) do
+                        if type(v) == "function" then
+                            logging.info("  - " .. tostring(k))
+                        end
+                    end
+                    
+                    local timeline = project:GetCurrentTimeline()
+                    if timeline then
+                        logging.info("Available methods on Timeline object:")
+                        for k, v in pairs(timeline) do
+                            if type(v) == "function" then
+                                logging.info("  - " .. tostring(k))
+                            end
+                        end
+                    else
+                        logging.warning("Could not get current timeline.")
+                    end
+                else
+                    logging.warning("Could not get current project.")
+                end
                 return resolve
             else
                 logging.warning("Attempt " .. attempt .. ": Failed to get Resolve: " .. tostring(result))

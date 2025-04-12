@@ -1,8 +1,9 @@
 -- AI Simulation Module
--- Simulates AI processing functions since DaVinci Resolve doesn't have built-in AI
+-- Now uses Fairlight functions for audio processing.
 
 local logging = require("logging")
 local timeline = require("lib.timeline")
+
 
 local ai_simulation = {}
 
@@ -359,79 +360,33 @@ end
 -- @param callback Optional progress callback function(percent)
 -- @return true if successful, false otherwise
 function ai_simulation.enhance_audio(timeline_obj, settings, callback)
-    if not timeline_obj then
-        logging.error("Cannot enhance audio: No timeline provided")
-        return false
-    end
+    local fairlight_audio = require("lib.fairlight_audio")
     
-    settings = settings or {
-        normalize = true,
-        noise_reduction = 0.5,
-        eq = true,
-        compression = 0.3
-    }
+    -- If timeline is not already provided, try to get it
+    if not timeline_obj then
+        local resolve = require("lib.resolve_connection").resolve
+        local project = resolve:GetProjectManager():GetCurrentProject()
+        if not project then
+            logging.error("Cannot enhance audio: No project found")
+            return false
+        end
+        timeline_obj = project:GetCurrentTimeline()
+    end
     
     -- Get all audio tracks in the timeline
-    local audio_tracks = {}
-    for i = 1, 10 do -- Try up to 10 audio tracks
-        local items = timeline_obj:GetItemListInTrack("audio", i)
-        if items and #items > 0 then
-            table.insert(audio_tracks, i)
+    local audio_track_count = timeline_obj:GetTrackCount("audio")
+    logging.info("Starting Fairlight audio enhancements on " .. audio_track_count .. " audio tracks")
+    
+    for track_index = 1, audio_track_count do
+        if not fairlight_audio.normalize_track_volume(timeline_obj, track_index) then
+            logging.error("Failed to normalize volume for audio track " .. track_index)
+        end
+        if not fairlight_audio.apply_noise_reduction(timeline_obj, track_index) then
+            logging.error("Failed to apply noise reduction for audio track " .. track_index)
         end
     end
     
-    if #audio_tracks == 0 then
-        logging.warning("No audio tracks found in timeline")
-        return false
-    end
-    
-    logging.info("Starting AI audio enhancements on " .. #audio_tracks .. " audio tracks")
-    
-    -- Pretend to process each audio track
-    for i, track_index in ipairs(audio_tracks) do
-        local items = timeline_obj:GetItemListInTrack("audio", track_index)
-        
-        for j, item in ipairs(items) do
-            -- Simulate processing delay
-            local delay = math.random() * 0.4 + 0.1 -- 0.1 to 0.5 seconds
-            os.execute("sleep " .. delay)
-            
-            -- Update progress if callback provided
-            if callback and type(callback) == "function" then
-                local total_items = 0
-                for _, track in ipairs(audio_tracks) do
-                    total_items = total_items + #timeline_obj:GetItemListInTrack("audio", track)
-                end
-                
-                local item_count = 0
-                for k = 1, i-1 do
-                    item_count = item_count + #timeline_obj:GetItemListInTrack("audio", audio_tracks[k])
-                end
-                item_count = item_count + j
-                
-                callback(math.floor((item_count / total_items) * 100))
-            end
-        end
-    end
-    
-    -- Log applied enhancements
-    if settings.normalize then
-        logging.info("Applied audio normalization")
-    end
-    
-    if settings.noise_reduction > 0 then
-        logging.info("Applied noise reduction (strength: " .. settings.noise_reduction .. ")")
-    end
-    
-    if settings.eq then
-        logging.info("Applied EQ adjustments")
-    end
-    
-    if settings.compression > 0 then
-        logging.info("Applied compression (strength: " .. settings.compression .. ")")
-    end
-    
-    logging.info("AI audio enhancements completed")
+    logging.info("Fairlight audio enhancements completed")
     return true
 end
 

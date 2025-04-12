@@ -6,6 +6,110 @@ local timeline = require("timeline")
 
 local color = {}
 
+-- Table to store additional LUT directories
+local custom_lut_directories = {}
+
+-- Add a custom LUT directory to be scanned
+-- @param directory Path to the directory containing LUTs
+function color.add_lut_directory(directory)
+    if directory and type(directory) == "string" then
+        table.insert(custom_lut_directories, directory)
+    end
+end
+
+-- Scan for available LUTs in Resolve's LUT directories
+-- @return A table of available LUTs
+function color.scan_luts()
+    local lut_paths = {}
+    
+    -- Get the OS type
+    local os_name = "unknown"
+    if package.config:sub(1,1) == '\\' then
+        os_name = "windows"
+    elseif os.execute('uname -s >/dev/null 2>&1') == 0 then
+        local handle = io.popen('uname -s')
+        if handle then
+            local result = handle:read("*a")
+            handle:close()
+            result = result:gsub("^%s*(.-)%s*$", "%1") -- Trim whitespace
+            
+            if result == "Darwin" then
+                os_name = "macos"
+            elseif result:match("Linux") then
+                os_name = "linux"
+            end
+        end
+    end
+    
+    -- Set directories based on OS
+    if os_name == "windows" then
+        -- Windows paths
+        table.insert(lut_paths, os.getenv("USERPROFILE") .. "\\Documents\\Blackmagic Design\\DaVinci Resolve\\LUT")
+        table.insert(lut_paths, "C:\\ProgramData\\Blackmagic Design\\DaVinci Resolve\\Support\\LUT")
+    elseif os_name == "macos" then
+        -- macOS paths
+        table.insert(lut_paths, os.getenv("HOME") .. "/Library/Application Support/Blackmagic Design/DaVinci Resolve/LUT")
+        table.insert(lut_paths, "/Library/Application Support/Blackmagic Design/DaVinci Resolve/LUT")
+    elseif os_name == "linux" then
+        -- Linux paths
+        table.insert(lut_paths, os.getenv("HOME") .. "/.local/share/DaVinciResolve/LUT")
+        table.insert(lut_paths, "/opt/resolve/LUT")
+    end
+    
+    -- Add custom directories
+    for _, path in ipairs(custom_lut_directories) do
+        table.insert(lut_paths, "/opt/resolve/LUT")
+    end
+    
+    local available_luts = {}
+    for _, path in ipairs(lut_paths) do
+        local dir = io.popen("ls -p \"" .. path .. "\"")
+        if dir then
+            local files = dir:read("*a")
+            dir:close()
+            for file in string.gmatch(files, "([^\n]+)") do
+                if file:match("%.cube$") or file:match("%.3dl$") then
+                    local full_path = path .. "/" .. file
+                    full_path = full_path:gsub("/", package.config:sub(1,1))
+                    table.insert(available_luts, { name = file, path = full_path })
+                end
+            end
+        end
+    end
+    
+    return available_luts
+end
+
+
+-- Get a list of LUTs specifically optimized for drone/aerial footage
+-- @return A table of LUTs suitable for drone footage
+function color.get_drone_optimized_luts()
+    local drone_luts = {}
+    if not color.available_luts then
+        return "No LUTs found. Please run the scan_luts function first."
+    end
+    for _, lut in ipairs(color.available_luts) do
+        local lower_name = lut.name:lower()
+        if lower_name:match("drone") or lower_name:match("aerial") then
+            table.insert(drone_luts, {
+                name = lut.name,
+                path = lut.path,
+                type = "Drone"
+            })
+        end
+    end
+
+    if #drone_luts == 0 then
+        return "No drone or aerial specific LUTs found."
+    else
+        return drone_luts
+    }
+end
+
+color.available_luts = color.scan_luts()
+
+
+
 -- Apply a LUT to all clips in the current timeline
 -- @param project Current project
 -- @param lut_path Path to the LUT file
@@ -84,7 +188,7 @@ function color.get_lut_path(lut_name)
             
             if result == "Darwin" then
                 os_name = "macos"
-            elseif result == "Linux" then
+            elseif result:match("Linux") then
                 os_name = "linux"
             end
         end
